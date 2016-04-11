@@ -5,6 +5,8 @@ Created on Tue Mar 29 10:49:02 2016
 @author: Omer Tzuk <omertz@post.bgu.ac.il>
 """
 import numpy as np
+from scipy import stats
+import igraph
 #import h5py as h5
 
 class NetStruct(object):
@@ -31,22 +33,38 @@ class NetStruct(object):
             freq[l]= count/float((2*self.npop)-zeros)
         self.freq_allele = freq
 
-    def createMatrix(self):
+    def buildGDmatrix(self):
         A = np.zeros((self.npop,self.npop))
         for i in np.arange(self.npop):
             for j in np.arange(i+1,self.npop):
                 A[i,j]=self.calc_edge(i,j)
         self.A = A + A.T
+        self.A_graph = igraph.Graph.Adjacency(self.A.tolist())
+        
+    def Athreshold(self,threshold):
+        return stats.threshold(self.A, threshmin=threshold,newval=0)
 
     def calc_edge(self,i,j):
         Sij = np.empty(self.nloci)
+        nzeros=0
         for l in range(self.nloci):
-            Iac = int(self.data[i,l*2]==self.data[j,l*2])
-            Iad = int(self.data[i,l*2]==self.data[j,l*2+1])
-            Ibc = int(self.data[i,l*2+1]==self.data[j,l*2])
-            Ibd = int(self.data[i,l*2+1]==self.data[j,l*2+1])
-            Sij[l]=(1.0/4)*((1.0-self.freq_allele[l][self.data[i,l*2]])*(Iac+Iad)+(1.0-self.freq_allele[l][self.data[i,l*2+1]])*(Ibc+Ibd))
-        return (1.0/self.nloci)*np.sum(Sij)
+            a=self.data[i,l*2]
+            b=self.data[i,l*2+1]
+            c=self.data[j,l*2]
+            d=self.data[j,l*2+1]
+            if any([a,b,c,d])==0: nzeros+=1
+            Iac = int(a==c)
+            Iad = int(a==d)
+            Ibc = int(b==c)
+            Ibd = int(b==d)
+            fa=self.freq_allele[l][self.data[i,l*2]]
+            fb=self.freq_allele[l][self.data[i,l*2+1]]
+            Sij[l]=(1.0/4)*((1.0-fa)*(Iac+Iad)+(1.0-fb)*(Ibc+Ibd))
+        if nzeros==self.nloci:
+            Sijtot=0
+        else:
+            Sijtot=(1.0/(self.nloci-nzeros))*np.sum(Sij)
+        return Sijtot
 
 
 def readfile(fname):
@@ -67,6 +85,10 @@ def add_parser_arguments(parser):
     parser.add_argument('--csvfile', type=str, nargs='?',
                         default='wildass4pops.csv',
                         dest='fname',
+                        help='input file')
+    parser.add_argument('--outputfile', type=str, nargs='?',
+                        default='test',
+                        dest='outfname',
                         help='output file')
     return parser
 
