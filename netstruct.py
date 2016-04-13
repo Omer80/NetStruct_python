@@ -19,7 +19,7 @@ class NetStruct(object):
         if ind is not None:
             self.ind=ind
         self.calc_allele_freq()
-        self.createMatrix()
+        self.buildGDmatrix()
 
     def calc_allele_freq(self):
         max_l = np.max(self.data)
@@ -40,7 +40,7 @@ class NetStruct(object):
                 A[i,j]=self.calc_edge(i,j)
         self.A = A + A.T
         self.A_graph = igraph.Graph.Adjacency(self.A.tolist())
-        
+
     def Athreshold(self,threshold):
         return stats.threshold(self.A, threshmin=threshold,newval=0)
 
@@ -52,7 +52,8 @@ class NetStruct(object):
             b=self.data[i,l*2+1]
             c=self.data[j,l*2]
             d=self.data[j,l*2+1]
-            if any([a,b,c,d])==0: nzeros+=1
+            if np.count_nonzero([a,b,c,d])!=4:
+                nzeros+=1
             Iac = int(a==c)
             Iad = int(a==d)
             Ibc = int(b==c)
@@ -63,7 +64,7 @@ class NetStruct(object):
         if nzeros==self.nloci:
             Sijtot=0
         else:
-            Sijtot=(1.0/(self.nloci-nzeros))*np.sum(Sij)
+            Sijtot=(np.sum(Sij)/float((self.nloci-nzeros)))
         return Sijtot
 
 
