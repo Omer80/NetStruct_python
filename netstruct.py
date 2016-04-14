@@ -4,6 +4,8 @@ Created on Tue Mar 29 10:49:02 2016
 
 @author: Omer Tzuk <omertz@post.bgu.ac.il>
 """
+__version__= 1.0
+__author__ = """Omer Tzuk (omertz@post.bgu.ac.il)"""
 import numpy as np
 from scipy import stats
 import igraph
@@ -38,14 +40,24 @@ class NetStruct(object):
         for i in np.arange(self.npop):
             for j in np.arange(i+1,self.npop):
                 A[i,j]=self.calc_edge(i,j)
-        self.A = A + A.T
-        self.A_graph = igraph.Graph.Adjacency(self.A.tolist())
+        self.A = A  + A.T
+        
 
     def Athreshold(self,threshold):
         return stats.threshold(self.A, threshmin=threshold,newval=0)
 
+    def FindCommunities(self,algorithm,threshold=0.0):
+        matrix = self.Athreshold(threshold)
+        A = []
+        for i in np.arange(self.npop):
+            for j in np.arange(i+1,self.npop):
+                if matrix[i,j]>0:
+                    A.append((i,j,matrix[i,j]))
+        A_graph = igraph.Graph.Weighted_Adjacency(self.Athreshold(threshold),,mode="UPPER")
+        return A
+
     def calc_edge(self,i,j):
-        Sij = np.empty(self.nloci)
+        Sij = np.zeros(self.nloci)
         nzeros=0
         for l in range(self.nloci):
             a=self.data[i,l*2]
@@ -54,13 +66,14 @@ class NetStruct(object):
             d=self.data[j,l*2+1]
             if np.count_nonzero([a,b,c,d])!=4:
                 nzeros+=1
-            Iac = int(a==c)
-            Iad = int(a==d)
-            Ibc = int(b==c)
-            Ibd = int(b==d)
-            fa=self.freq_allele[l][self.data[i,l*2]]
-            fb=self.freq_allele[l][self.data[i,l*2+1]]
-            Sij[l]=(1.0/4)*((1.0-fa)*(Iac+Iad)+(1.0-fb)*(Ibc+Ibd))
+            else:
+                Iac = int(a==c)
+                Iad = int(a==d)
+                Ibc = int(b==c)
+                Ibd = int(b==d)
+                fa=self.freq_allele[l][self.data[i,l*2]]
+                fb=self.freq_allele[l][self.data[i,l*2+1]]
+                Sij[l]=(1.0/4)*((1.0-fa)*(Iac+Iad)+(1.0-fb)*(Ibc+Ibd))
         if nzeros==self.nloci:
             Sijtot=0
         else:
