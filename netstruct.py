@@ -41,20 +41,20 @@ class NetStruct(object):
             for j in np.arange(i+1,self.npop):
                 A[i,j]=self.calc_edge(i,j)
         self.A = A  + A.T
-        
+
 
     def Athreshold(self,threshold):
         return stats.threshold(self.A, threshmin=threshold,newval=0)
 
     def FindCommunities(self,algorithm,threshold=0.0):
-        matrix = self.Athreshold(threshold)
-        A = []
-        for i in np.arange(self.npop):
-            for j in np.arange(i+1,self.npop):
-                if matrix[i,j]>0:
-                    A.append((i,j,matrix[i,j]))
-        A_graph = igraph.Graph.Weighted_Adjacency(self.Athreshold(threshold),,mode="UPPER")
-        return A
+#        matrix = self.Athreshold(threshold)
+#        A = []
+#        for i in np.arange(self.npop):
+#            for j in np.arange(i+1,self.npop):
+#                if matrix[i,j]>0:
+#                    A.append((i,j,matrix[i,j]))
+        A_graph = igraph.Graph.Weighted_Adjacency(self.Athreshold(threshold).tolist(),mode="UPPER")
+        return A_graph
 
     def calc_edge(self,i,j):
         Sij = np.zeros(self.nloci)
