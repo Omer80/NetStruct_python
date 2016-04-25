@@ -42,19 +42,66 @@ class NetStruct(object):
                 A[i,j]=self.calc_edge(i,j)
         self.A = A  + A.T
 
-
     def Athreshold(self,threshold):
         return stats.threshold(self.A, threshmin=threshold,newval=0)
 
-    def FindCommunities(self,algorithm,threshold=0.0):
-#        matrix = self.Athreshold(threshold)
-#        A = []
-#        for i in np.arange(self.npop):
-#            for j in np.arange(i+1,self.npop):
-#                if matrix[i,j]>0:
-#                    A.append((i,j,matrix[i,j]))
-        A_graph = igraph.Graph.Weighted_Adjacency(self.Athreshold(threshold).tolist(),mode="UPPER")
-        return A_graph
+    def clustering_algorithm(self,graph,algorithm_num=1):
+#        print graph.es["weight"]
+#        print "min,max weight", min(graph.es["weight"]),max(graph.es["weight"])
+        if algorithm_num==1:
+            dendrogram = graph.community_label_propagation(weights="weight")
+        elif algorithm_num==2:
+            dendrogram = graph.community_edge_betweenness(weights="weight")
+        elif algorithm_num==3:
+            dendrogram = graph.community_fastgreedy(weights="weight")
+        elif algorithm_num==4:
+            dendrogram = graph.community_walktrap(weights="weight")
+        elif algorithm_num==5:
+            dendrogram = graph.community_spinglass(weights="weight")
+        elif algorithm_num==6:
+            dendrogram = graph.community_leading_eigenvector(weights="weight")
+        else:
+            print "No such option!"
+            dendrogram = None
+        return dendrogram
+
+    def FindCommunities(self,threshold=0.0,algorithm_num=1):
+        """ (threshold,algorithm_num)->(list_of_clusters_memberships)
+        matx - a threshold for the adjacenncy matrix
+        algorithm_num - an integer for choosing the clustering algorithm type.
+
+        Choose one of the following options for community plus modularity detection
+        algorithm_num chooses one of the following methods:
+        1 : label.propagation.community
+        2 : edge.betweenness.community
+        3 : fastgreedy.community
+        4 : walktrap.community
+        5 : spinglass.community
+        6 : leading.eigenvector.community
+        """
+        matx = self.Athreshold(threshold)
+        graph = igraph.Graph.Weighted_Adjacency(matx.tolist(),attr="weight",mode="UPPER")
+        graph["name"] = "NetStruck Weighted Adjacency with threshold={0}".format(threshold)
+        graph.vs['area']=self.area
+        graph.vs['ind']=self.ind
+        components = graph.components()
+        initial_membership_num = []
+        initial_membership_num.append(0)
+        graphs = {}
+        for i,subgraph in enumerate(components.subgraphs()):
+#            print i,subgraph.__class__,subgraph.vcount()
+            if subgraph.vcount()>1:
+                dendrogram=self.clustering_algorithm(subgraph,algorithm_num)
+                clusters = dendrogram.as_clustering()
+                membership = clusters.membership
+                membership = [ x + initial_membership_num[i] for x in membership]
+                initial_membership_num.append(max(membership)+1)
+            else:
+                initial_membership_num.append(initial_membership_num[i]+1)
+                membership =  initial_membership_num[i]
+            subgraph.vs["cluster"]=membership
+            graphs[i]=subgraph
+        return graphs
 
     def calc_edge(self,i,j):
         Sij = np.zeros(self.nloci)
@@ -79,7 +126,6 @@ class NetStruct(object):
         else:
             Sijtot=(np.sum(Sij)/float((self.nloci-nzeros)))
         return Sijtot
-
 
 def readfile(fname):
     with open(fname) as f:
