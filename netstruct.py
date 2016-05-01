@@ -49,21 +49,24 @@ class NetStruct(object):
 #        print graph.es["weight"]
 #        print "min,max weight", min(graph.es["weight"]),max(graph.es["weight"])
         if algorithm_num==1:
-            dendrogram = graph.community_label_propagation(weights="weight")
+            clusters = graph.community_label_propagation(weights="weight")
         elif algorithm_num==2:
             dendrogram = graph.community_edge_betweenness(weights="weight")
+            clusters = dendrogram.as_clustering()
         elif algorithm_num==3:
             dendrogram = graph.community_fastgreedy(weights="weight")
+            clusters = dendrogram.as_clustering()
         elif algorithm_num==4:
             dendrogram = graph.community_walktrap(weights="weight")
+            clusters = dendrogram.as_clustering()
         elif algorithm_num==5:
-            dendrogram = graph.community_spinglass(weights="weight")
+            clusters = graph.community_spinglass(weights="weight")
         elif algorithm_num==6:
-            dendrogram = graph.community_leading_eigenvector(weights="weight")
+            clusters = graph.community_leading_eigenvector(weights="weight")
         else:
             print "No such option!"
-            dendrogram = None
-        return dendrogram
+            clusters = None
+        return clusters
 
     def FindCommunities(self,threshold=0.0,algorithm_num=1):
         """ (threshold,algorithm_num)->(list_of_clusters_memberships)
@@ -72,37 +75,70 @@ class NetStruct(object):
 
         Choose one of the following options for community plus modularity detection
         algorithm_num chooses one of the following methods:
-        1 : label.propagation.community
-        2 : edge.betweenness.community
-        3 : fastgreedy.community
-        4 : walktrap.community
-        5 : spinglass.community
-        6 : leading.eigenvector.community
+        1 : label.propagation.community    -> returns VertexClustering object.
+        2 : edge.betweenness.community     -> returns VertexDendrogram object.
+        3 : fastgreedy.community           -> returns VertexDendrogram object.
+        4 : walktrap.community             -> returns VertexDendrogram object.
+        5 : spinglass.community            -> returns VertexClustering object.
+        6 : leading.eigenvector.community  -> returns VertexClustering object.
         """
         matx = self.Athreshold(threshold)
         graph = igraph.Graph.Weighted_Adjacency(matx.tolist(),attr="weight",mode="UPPER")
         graph["name"] = "NetStruck Weighted Adjacency with threshold={0}".format(threshold)
-        graph.vs['area']=self.area
-        graph.vs['ind']=self.ind
+        graph.vs["area"]=self.area
+        graph.vs["name"]=map(str,self.ind)
         components = graph.components()
         initial_membership_num = []
         initial_membership_num.append(0)
-        graphs = {}
+        graphs = []
+        membership_list = []
         for i,subgraph in enumerate(components.subgraphs()):
 #            print i,subgraph.__class__,subgraph.vcount()
             if subgraph.vcount()>1:
-                dendrogram=self.clustering_algorithm(subgraph,algorithm_num)
-                clusters = dendrogram.as_clustering()
+                clusters=self.clustering_algorithm(subgraph,algorithm_num)
+#                for c in clusters:
+#                    print clusters.vs[c]["name"]
+#                clusters = dendrogram.as_clustering()
                 membership = clusters.membership
                 membership = [ x + initial_membership_num[i] for x in membership]
                 initial_membership_num.append(max(membership)+1)
             else:
                 initial_membership_num.append(initial_membership_num[i]+1)
-                membership =  initial_membership_num[i]
-            subgraph.vs["cluster"]=membership
-            graphs[i]=subgraph
+                membership =  [initial_membership_num[i]]
+            membership_list.append(membership)
+#        print membership_list
+        membership_list = self.organize_in_decreasing_order(membership_list)
+#        print membership_list
+        for i,subgraph in enumerate(components.subgraphs()):
+#            print membership_list[i]
+            subgraph.vs["cluster"]=membership_list[i]
+            graphs.append(subgraph)
         return graphs
 
+    def organize_in_decreasing_order(self,membership_list):
+        conlist = np.concatenate(membership_list)
+        count=np.bincount(conlist)
+        ordered_list = []
+        for i in range(len(count)):
+            ordered_list.append(np.argmax(count))
+            count[np.argmax(count)]=0
+#        print ordered_list
+        maxvalue = max(conlist)
+        locations = []
+        for number in range(maxvalue+1):
+            locs = []
+            for i in range(len(membership_list)):
+                for j in range(len(membership_list[i])):
+                    if membership_list[i][j]==number:
+                        locs.append((i,j))
+            locations.append(locs)
+        for i,value in enumerate(ordered_list):
+            for location in locations[value]:
+#                print location
+#                print location[0],location[1]
+                membership_list[location[0]][location[1]]=i
+        return membership_list
+        
     def calc_edge(self,i,j):
         Sij = np.zeros(self.nloci)
         nzeros=0
@@ -127,6 +163,18 @@ class NetStruct(object):
             Sijtot=(np.sum(Sij)/float((self.nloci-nzeros)))
         return Sijtot
 
+def writefile(graphs):
+    import csv
+    with open('temp.csv', 'w') as csvfile:
+        fieldnames = ['area', 'name','cluster']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for subgraph in graphs:
+            rows = zip(subgraph.vs["area"],subgraph.vs["name"],subgraph.vs["cluster"])
+            for row in rows:
+#                print str(row[2])
+                writer.writerow({'area': row[0], 'name':row[1] ,'cluster':row[2]})
+        
 def readfile(fname):
     with open(fname) as f:
        ncols = len(f.readline().split(','))
