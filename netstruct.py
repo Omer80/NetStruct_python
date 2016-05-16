@@ -41,6 +41,7 @@ class NetStruct(object):
             for j in np.arange(i+1,self.npop):
                 A[i,j]=self.calc_edge(i,j)
         self.A = A  + A.T
+        # output to file CSV
 
     def Athreshold(self,threshold):
         return stats.threshold(self.A, threshmin=threshold,newval=0)
@@ -67,7 +68,7 @@ class NetStruct(object):
             print "No such option!"
             clusters = None
         return clusters
-
+# the function should accept a data file of the matrix output of buildGDmatrix
     def FindCommunities(self,threshold=0.0,algorithm_num=1):
         """ (threshold,algorithm_num)->(list_of_clusters_memberships)
         matx - a threshold for the adjacenncy matrix
@@ -83,10 +84,12 @@ class NetStruct(object):
         6 : leading.eigenvector.community  -> returns VertexClustering object.
         """
         matx = self.Athreshold(threshold)
+        self.Astar = matx.sum()
         graph = igraph.Graph.Weighted_Adjacency(matx.tolist(),attr="weight",mode="UPPER")
-        graph["name"] = "NetStruck Weighted Adjacency with threshold={0}".format(threshold)
+        graph["name"] = "NetStruck Weighted Graph with threshold={0}".format(threshold)
         graph.vs["area"]=self.area
         graph.vs["name"]=map(str,self.ind)
+        graph.vs["degree"]=matx.sum(axis=1)
         components = graph.components()
         initial_membership_num = []
         initial_membership_num.append(0)
@@ -113,7 +116,19 @@ class NetStruct(object):
 #            print membership_list[i]
             subgraph.vs["cluster"]=membership_list[i]
             graphs.append(subgraph)
-        return graphs
+            for vertex in subgraph.vs:
+                graph.vs.find(str(vertex["name"]))["cluster"]=vertex["cluster"]
+        self.Agraph = graph
+        self.Amatx  = matx
+        return graph
+        
+    def SADanalysis(self,zipped_pickle_fname,threshold):
+        """ (fname_matrix,fname_communities)->
+        
+        """
+        return f_SAD #save in CSV format
+        
+    def SignificanceTest(self,)
 
     def organize_in_decreasing_order(self,membership_list):
         conlist = np.concatenate(membership_list)
@@ -169,11 +184,15 @@ def writefile(graphs):
         fieldnames = ['area', 'name','cluster']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
+        tonumpy = []
         for subgraph in graphs:
             rows = zip(subgraph.vs["area"],subgraph.vs["name"],subgraph.vs["cluster"])
             for row in rows:
 #                print str(row[2])
                 writer.writerow({'area': row[0], 'name':row[1] ,'cluster':row[2]})
+                tonumpy.append((row[0],row[1],row[2]))
+    return np.asarray(tonumpy)
+                
         
 def readfile(fname):
     with open(fname) as f:
