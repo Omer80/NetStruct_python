@@ -9,6 +9,7 @@ __author__ = """Omer Tzuk (omertz@post.bgu.ac.il)"""
 import numpy as np
 from scipy import stats
 import igraph
+import zipfile
 #import h5py as h5
 
 class NetStruct(object):
@@ -122,13 +123,42 @@ class NetStruct(object):
         self.Amatx  = matx
         return graph
         
+    def loopGDmat(self,threshold_min, threshold_max,threshold_delta,piecharts_fname="piecharts",zipped_pickle_fname="zipped_graphs", algorithm_num=1):
+        """ """
+        graphs=[]
+        thresholds = np.arange(threshold_min, threshold_max+threshold_delta,threshold_delta)
+        with zipfile.ZipFile(zipped_pickle_fname+".zip", 'w') as myzip:
+            for threshold in thresholds:
+                graph = self.FindCommunities(threshold,algorithm_num)
+                graphs.append(graph)
+                graph.write_picklez(fname=str(int(threshold*1000)))
+                myzip.write(str(int(threshold*1000)))
+        self.createPieCharts(thresholds,graphs)
+#            graphs.append(self.FindCommunities(threshold,algorithm_num))
+        return thresholds,graphs
+        
+    def createPieCharts(self,thresholds,graphs,piecharts_fname="piecharts"):
+        """ """
+        import datetime
+        from matplotlib.backends.backend_pdf import PdfPages
+        import matplotlib.pyplot as plt
+        with PdfPages(piecharts_fname+'.pdf') as pdf:
+            # Adding metadata for PDF file
+            d = pdf.infodict()
+            d['Title'] = 'Multipage PDF Example'
+            d['Author'] = u'Jouni K. Sepp\xe4nen'
+            d['Subject'] = 'How to create a multipage pdf file and set its metadata'
+            d['Keywords'] = 'PdfPages multipage keywords author title subject'
+            d['CreationDate'] = datetime.datetime.today()
+        
+        
     def SADanalysis(self,zipped_pickle_fname,threshold):
         """ (fname_matrix,fname_communities)->
         
         """
         return f_SAD #save in CSV format
         
-    def SignificanceTest(self,)
+#    def SignificanceTest(self,)
 
     def organize_in_decreasing_order(self,membership_list):
         conlist = np.concatenate(membership_list)
@@ -177,6 +207,8 @@ class NetStruct(object):
         else:
             Sijtot=(np.sum(Sij)/float((self.nloci-nzeros)))
         return Sijtot
+
+
 
 def writefile(graphs):
     import csv
