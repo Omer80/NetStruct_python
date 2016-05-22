@@ -122,7 +122,7 @@ class NetStruct(object):
         self.Agraph = graph
         self.Amatx  = matx
         return graph
-        
+
     def loopGDmat(self,threshold_min, threshold_max,threshold_delta,piecharts_fname="piecharts",zipped_pickle_fname="zipped_graphs", algorithm_num=1):
         """ """
         graphs=[]
@@ -136,13 +136,25 @@ class NetStruct(object):
         self.createPieCharts(thresholds,graphs)
 #            graphs.append(self.FindCommunities(threshold,algorithm_num))
         return thresholds,graphs
-        
+
     def createPieCharts(self,thresholds,graphs,piecharts_fname="piecharts"):
         """ """
         import datetime
         from matplotlib.backends.backend_pdf import PdfPages
         import matplotlib.pyplot as plt
+        num_columns = len(np.unique(self.area))
+        num_rows    = len(thresholds)
         with PdfPages(piecharts_fname+'.pdf') as pdf:
+            fig, ax = plt.subplots(num_rows,num_columns)
+            plt.title('Raining Hogs and Dogs', bbox={'facecolor':'0.8', 'pad':5})
+            labels = 'Frogs', 'Hogs', 'Dogs', 'Logs'
+            fracs = [15, 30, 45, 10]
+            explode=(0, 0.05, 0, 0)
+            plt.pie(fracs, explode=explode, labels=labels,
+                    autopct='%1.1f%%', shadow=True, startangle=90)
+            pdf.savefig(fig)
+            plt.close()
+            plt.title("Piecharts")
             # Adding metadata for PDF file
             d = pdf.infodict()
             d['Title'] = 'Multipage PDF Example'
@@ -150,14 +162,14 @@ class NetStruct(object):
             d['Subject'] = 'How to create a multipage pdf file and set its metadata'
             d['Keywords'] = 'PdfPages multipage keywords author title subject'
             d['CreationDate'] = datetime.datetime.today()
-        
-        
+
+
     def SADanalysis(self,zipped_pickle_fname,threshold):
         """ (fname_matrix,fname_communities)->
-        
+
         """
         return f_SAD #save in CSV format
-        
+
 #    def SignificanceTest(self,)
 
     def organize_in_decreasing_order(self,membership_list):
@@ -183,7 +195,7 @@ class NetStruct(object):
 #                print location[0],location[1]
                 membership_list[location[0]][location[1]]=i
         return membership_list
-        
+
     def calc_edge(self,i,j):
         Sij = np.zeros(self.nloci)
         nzeros=0
@@ -224,8 +236,8 @@ def writefile(graphs):
                 writer.writerow({'area': row[0], 'name':row[1] ,'cluster':row[2]})
                 tonumpy.append((row[0],row[1],row[2]))
     return np.asarray(tonumpy)
-                
-        
+
+
 def readfile(fname):
     with open(fname) as f:
        ncols = len(f.readline().split(','))
