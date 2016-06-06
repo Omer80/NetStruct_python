@@ -142,27 +142,38 @@ class NetStruct(object):
         import datetime
         from matplotlib.backends.backend_pdf import PdfPages
         import matplotlib.pyplot as plt
-        num_columns = len(np.unique(self.area))
+        areas = np.unique(self.area)
+        num_columns = len(areas)
         num_rows    = len(thresholds)
         with PdfPages(piecharts_fname+'.pdf') as pdf:
             fig, ax = plt.subplots(num_rows,num_columns)
-            plt.title('Raining Hogs and Dogs', bbox={'facecolor':'0.8', 'pad':5})
+#            fig.suptitle('Raining Hogs and Dogs', bbox={'facecolor':'0.8', 'pad':5})
             labels = 'Frogs', 'Hogs', 'Dogs', 'Logs'
             fracs = [15, 30, 45, 10]
             explode=(0, 0.05, 0, 0)
-            plt.pie(fracs, explode=explode, labels=labels,
-                    autopct='%1.1f%%', shadow=True, startangle=90)
+            for i,threshold in enumerate(thresholds):
+                fracs_test = self.calcPiecharts(graphs[i])
+                for j,area in enumerate(areas):
+                    ax[i,j].set_title(area)
+                    ax[i,j].pie(fracs, explode=explode, labels=labels,
+                                autopct='%1.1f%%', shadow=True, startangle=90)
+                    ax[i,j].set_aspect('equal')
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)            
             pdf.savefig(fig)
             plt.close()
-            plt.title("Piecharts")
             # Adding metadata for PDF file
             d = pdf.infodict()
-            d['Title'] = 'Multipage PDF Example'
-            d['Author'] = u'Jouni K. Sepp\xe4nen'
-            d['Subject'] = 'How to create a multipage pdf file and set its metadata'
-            d['Keywords'] = 'PdfPages multipage keywords author title subject'
+            d['Title'] = 'Pie charts'
+#            d['Author'] = u'Jouni K. Sepp\xe4nen'
+#            d['Subject'] = 'How to create a multipage pdf file and set its metadata'
+#            d['Keywords'] = 'PdfPages multipage keywords author title subject'
             d['CreationDate'] = datetime.datetime.today()
 
+    def calcPiecharts(self,graph):
+        """ """
+        fracs = {}
+        print zip(self.area,graph.vs["cluster"])
+        return fracs
 
     def SADanalysis(self,zipped_pickle_fname,threshold):
         """ (fname_matrix,fname_communities)->
