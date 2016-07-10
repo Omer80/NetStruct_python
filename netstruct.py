@@ -66,7 +66,7 @@ class NetStruct(object):
         elif algorithm_num==6:
             clusters = graph.community_leading_eigenvector(weights="weight")
         else:
-            print "No such option!"
+            print ("No such option!")
             clusters = None
         return clusters
 # the function should accept a data file of the matrix output of buildGDmatrix
@@ -143,21 +143,24 @@ class NetStruct(object):
         from matplotlib.backends.backend_pdf import PdfPages
         import matplotlib.pyplot as plt
         areas = np.unique(self.area)
-        num_columns = len(areas)
+        self.dif_areas=areas
+        num_columns = len(areas)+1
         num_rows    = len(thresholds)
         with PdfPages(piecharts_fname+'.pdf') as pdf:
             fig, ax = plt.subplots(num_rows,num_columns)
 #            fig.suptitle('Raining Hogs and Dogs', bbox={'facecolor':'0.8', 'pad':5})
-            labels = 'Frogs', 'Hogs', 'Dogs', 'Logs'
-            fracs = [15, 30, 45, 10]
-            explode=(0, 0.05, 0, 0)
+#            labels = areas
+#            fracs = [15, 30, 45, 10]
+#            explode=(0, 0.05, 0, 0)
             for i,threshold in enumerate(thresholds):
-                fracs_test = self.calcPiecharts(graphs[i])
+                fracs = self.calcPiecharts(graphs[i])
+                ax[i,0].set_axis_off()                                  # Turn off axes & ticks
+                ax[i,0].text(0.5,0.5,threshold,ha='center',va='center')
                 for j,area in enumerate(areas):
-                    ax[i,j].set_title(area)
-                    ax[i,j].pie(fracs, explode=explode, labels=labels,
-                                autopct='%1.1f%%', shadow=True, startangle=90)
-                    ax[i,j].set_aspect('equal')
+                    ax[i,j+1].set_title(area)
+                    ax[i,j+1].pie(fracs[area])#, explode=explode, labels=labels,
+#                                autopct='%1.1f%%', shadow=True, startangle=90)
+                    ax[i,j+1].set_aspect('equal')
             plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)            
             pdf.savefig(fig)
             plt.close()
@@ -172,15 +175,63 @@ class NetStruct(object):
     def calcPiecharts(self,graph):
         """ """
         fracs = {}
-        print zip(self.area,graph.vs["cluster"])
+        mat=np.asarray(zip(graph.vs["area"],graph.vs["cluster"]))
+        for area in self.dif_areas:
+#            print map(int,mat[where(mat[:,0]==area)][:,1])
+            fracs[area]=np.bincount(map(int,mat[np.where(mat[:,0]==area)][:,1]))/float(len(map(int,mat[np.where(mat[:,0]==area)][:,1])))
+#            print fracs[area]
+#        print zip(self.area,graph.vs["cluster"])
         return fracs
 
-    def SADanalysis(self,zipped_pickle_fname,threshold):
+    def SADanalysis(self,zipped_pickle_fname,threshold,csv_fname="SADresults.csv"):
         """ (fname_matrix,fname_communities)->
-
+        Loads one of the pickled graphs from the zip file
+        Loops all of the individuals of the graph
+        and calculate SA on each individual of the graph
+        returns: 1) CSV file that first column area, 2nd ind, 3rd cluster,
+        4th strength of association
+        2) pickled graph with a new attribute of strength of association
         """
-        return f_SAD #save in CSV format
+        with zipfile.ZipFile(zipped_pickle_fname+".zip", 'r') as myzip:
+            myzip.extract(str(int(threshold*1000)))
+        graph=igraph.Graph.Read_Picklez(str(int(threshold*1000)))
+        names = graph.vs["name"]
+        rows=[]
+        for name in names:
+            min_modularity=self.SA(graph,name)
+            graph.vs.find("965")["SOA"]=min_modularity
+            rows.append((graph.vs.find(name)["area"],
+                      graph.vs.find(name)["name"],
+                      graph.vs.find(name)["cluster"],
+                      min_modularity))
+        import csv
+        with open(csv_fname, 'w') as csvfile:
+            fieldnames = ['area', 'name','cluster','SOA']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+#                print row
+                writer.writerow({'area':row[0],'name':row[1],'cluster':row[2],'SOA':row[3]})
+        return graph
+#        return f_SAD #save in CSV format
 
+    def SA(self,graph,name):
+        """ Loops on all of the clusters except the one from which name is from
+        create graph object that is similar to the input, just with the ind 
+        belonging to a different graph, and then calculating the modularity
+        of the new graph. Produces a minimum of a vector that gives
+        the difference between the original modularity and each one of the 
+        calculated modularities (for different cluster).
+        """
+        clusters=np.unique(graph.vs["cluster"])
+        original_cluster=graph.vs.find(name)["cluster"]
+        modularity_list = []
+        for i,cluster in enumerate(clusters):
+            if graph.vs.find(name)["cluster"]!=cluster:
+                graph.vs.find(name)["cluster"]=cluster
+            modularity_list.append(graph.modularity(graph.vs["cluster"],"weight"))
+        graph.vs.find(name)["cluster"]=original_cluster
+        return np.min(np.array(modularity_list))
 #    def SignificanceTest(self,)
 
     def organize_in_decreasing_order(self,membership_list):
@@ -258,7 +309,7 @@ def readfile(fname):
     return data,area,ind
 
 def main(args):
-    print args.fname
+    print (args.fname)
     global test
     data,area,ind=readfile(args.fname)
     test = NetStruct(data,area,ind)
