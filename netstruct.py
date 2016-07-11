@@ -161,7 +161,7 @@ class NetStruct(object):
                     ax[i,j+1].pie(fracs[area])#, explode=explode, labels=labels,
 #                                autopct='%1.1f%%', shadow=True, startangle=90)
                     ax[i,j+1].set_aspect('equal')
-            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)            
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
             pdf.savefig(fig)
             plt.close()
             # Adding metadata for PDF file
@@ -199,7 +199,7 @@ class NetStruct(object):
         rows=[]
         for name in names:
             min_modularity=self.SA(graph,name)
-            graph.vs.find("965")["SOA"]=min_modularity
+            graph.vs.find(name)["SOA"]=min_modularity
             rows.append((graph.vs.find(name)["area"],
                       graph.vs.find(name)["name"],
                       graph.vs.find(name)["cluster"],
@@ -217,20 +217,23 @@ class NetStruct(object):
 
     def SA(self,graph,name):
         """ Loops on all of the clusters except the one from which name is from
-        create graph object that is similar to the input, just with the ind 
+        create graph object that is similar to the input, just with the ind
         belonging to a different graph, and then calculating the modularity
         of the new graph. Produces a minimum of a vector that gives
-        the difference between the original modularity and each one of the 
+        the difference between the original modularity and each one of the
         calculated modularities (for different cluster).
         """
         clusters=np.unique(graph.vs["cluster"])
         original_cluster=graph.vs.find(name)["cluster"]
+        original_modularity = graph.modularity(graph.vs["cluster"],"weight")
+        print clusters,original_cluster,original_modularity
         modularity_list = []
         for i,cluster in enumerate(clusters):
             if graph.vs.find(name)["cluster"]!=cluster:
                 graph.vs.find(name)["cluster"]=cluster
-            modularity_list.append(graph.modularity(graph.vs["cluster"],"weight"))
+            modularity_list.append(original_modularity-graph.modularity(graph.vs["cluster"],"weight"))
         graph.vs.find(name)["cluster"]=original_cluster
+        print modularity_list
         return np.min(np.array(modularity_list))
 #    def SignificanceTest(self,)
 
