@@ -231,7 +231,7 @@ class NetStruct(object):
         for i,cluster in enumerate(clusters):
             if graph.vs.find(name)["cluster"]!=cluster:
                 graph.vs.find(name)["cluster"]=cluster
-            modularity_list.append(original_modularity-graph.modularity(graph.vs["cluster"],"weight"))
+                modularity_list.append(original_modularity-graph.modularity(graph.vs["cluster"],"weight"))
         graph.vs.find(name)["cluster"]=original_cluster
         print modularity_list
         return np.min(np.array(modularity_list))
