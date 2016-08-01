@@ -24,6 +24,30 @@ class NetStruct(object):
         self.calc_allele_freq()
         self.buildGDmatrix()
 
+    def calc_edge(self,i,j):
+        Sij = np.zeros(self.nloci)
+        nzeros=0
+        for l in range(self.nloci):
+            a=self.data[i,l*2]
+            b=self.data[i,l*2+1]
+            c=self.data[j,l*2]
+            d=self.data[j,l*2+1]
+            if np.count_nonzero([a,b,c,d])!=4:
+                nzeros+=1
+            else:
+                Iac = int(a==c)
+                Iad = int(a==d)
+                Ibc = int(b==c)
+                Ibd = int(b==d)
+                fa=self.freq_allele[l][self.data[i,l*2]]
+                fb=self.freq_allele[l][self.data[i,l*2+1]]
+                Sij[l]=(1.0/4)*((1.0-fa)*(Iac+Iad)+(1.0-fb)*(Ibc+Ibd))
+        if nzeros==self.nloci:
+            Sijtot=0
+        else:
+            Sijtot=(np.sum(Sij)/float((self.nloci-nzeros)))
+        return Sijtot
+
     def calc_allele_freq(self):
         max_l = np.max(self.data)
         freq  = np.zeros((self.nloci,max_l+1))
@@ -126,6 +150,7 @@ class NetStruct(object):
     def loopGDmat(self,threshold_min, threshold_max,threshold_delta,piecharts_fname="piecharts",zipped_pickle_fname="zipped_graphs", algorithm_num=1):
         """ """
         graphs=[]
+        import os
         thresholds = np.arange(threshold_min, threshold_max+threshold_delta,threshold_delta)
         with zipfile.ZipFile(zipped_pickle_fname+".zip", 'w') as myzip:
             for threshold in thresholds:
@@ -133,44 +158,49 @@ class NetStruct(object):
                 graphs.append(graph)
                 graph.write_picklez(fname=str(int(threshold*1000)))
                 myzip.write(str(int(threshold*1000)))
-        self.createPieCharts(thresholds,graphs)
+                try:
+                    os.remove(str(int(threshold*1000)))
+                except OSError:
+                    pass
+        self.createPieCharts(thresholds,graphs,piecharts_fname=piecharts_fname)
 #            graphs.append(self.FindCommunities(threshold,algorithm_num))
         return thresholds,graphs
 
     def createPieCharts(self,thresholds,graphs,piecharts_fname="piecharts"):
         """ """
-        import datetime
-        from matplotlib.backends.backend_pdf import PdfPages
+#        import datetime
+#        from matplotlib.backends.backend_pdf import PdfPages
+#        import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         areas = np.unique(self.area)
         self.dif_areas=areas
         num_columns = len(areas)+1
         num_rows    = len(thresholds)
-        with PdfPages(piecharts_fname+'.pdf') as pdf:
-            fig, ax = plt.subplots(num_rows,num_columns)
-#            fig.suptitle('Raining Hogs and Dogs', bbox={'facecolor':'0.8', 'pad':5})
-#            labels = areas
-#            fracs = [15, 30, 45, 10]
-#            explode=(0, 0.05, 0, 0)
-            for i,threshold in enumerate(thresholds):
-                fracs = self.calcPiecharts(graphs[i])
-                ax[i,0].set_axis_off()                                  # Turn off axes & ticks
-                ax[i,0].text(0.5,0.5,threshold,ha='center',va='center')
-                for j,area in enumerate(areas):
-                    ax[i,j+1].set_title(area)
-                    ax[i,j+1].pie(fracs[area])#, explode=explode, labels=labels,
-#                                autopct='%1.1f%%', shadow=True, startangle=90)
-                    ax[i,j+1].set_aspect('equal')
+        fig_x = num_columns * 5
+        fig_y = num_rows * 5
+#        with PdfPages(piecharts_fname+'.pdf') as pdf:
+        fig, ax = plt.subplots(num_rows,num_columns,figsize=(fig_x,fig_y))
+        for i,threshold in enumerate(thresholds):
+            fracs = self.calcPiecharts(graphs[i])
+            ax[i,0].set_axis_off()                                  # Turn off axes & ticks
+            ax[i,0].text(0.5,0.5,threshold,ha='center',va='center',fontsize=30, fontweight='bold')
+            for j,area in enumerate(areas):
+                ax[i,j+1].set_title(area,fontsize=30, fontweight='bold')
+                ax[i,j+1].pie(fracs[area])#, explode=explode, labels=labels,
+                #                                autopct='%1.1f%%', shadow=True, startangle=90)
+                ax[i,j+1].set_aspect('equal')
             plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-            pdf.savefig(fig)
-            plt.close()
+            plt.savefig(piecharts_fname+".pdf",format="pdf")
+#            plt.close()
             # Adding metadata for PDF file
-            d = pdf.infodict()
-            d['Title'] = 'Pie charts'
+#            d = pdf.infodict()
+#            d['Title'] = 'Pie charts'
 #            d['Author'] = u'Jouni K. Sepp\xe4nen'
 #            d['Subject'] = 'How to create a multipage pdf file and set its metadata'
 #            d['Keywords'] = 'PdfPages multipage keywords author title subject'
-            d['CreationDate'] = datetime.datetime.today()
+#            d['CreationDate'] = datetime.datetime.today()
 
     def calcPiecharts(self,graph):
         """ """
@@ -195,6 +225,11 @@ class NetStruct(object):
         with zipfile.ZipFile(zipped_pickle_fname+".zip", 'r') as myzip:
             myzip.extract(str(int(threshold*1000)))
         graph=igraph.Graph.Read_Picklez(str(int(threshold*1000)))
+        import os
+        try:
+            os.remove(str(int(threshold*1000)))
+        except OSError:
+            pass
         names = graph.vs["name"]
         rows=[]
         for name in names:
@@ -226,14 +261,14 @@ class NetStruct(object):
         clusters=np.unique(graph.vs["cluster"])
         original_cluster=graph.vs.find(name)["cluster"]
         original_modularity = graph.modularity(graph.vs["cluster"],"weight")
-        print clusters,original_cluster,original_modularity
+#        print clusters,original_cluster,original_modularity
         modularity_list = []
         for i,cluster in enumerate(clusters):
             if graph.vs.find(name)["cluster"]!=cluster:
                 graph.vs.find(name)["cluster"]=cluster
                 modularity_list.append(original_modularity-graph.modularity(graph.vs["cluster"],"weight"))
         graph.vs.find(name)["cluster"]=original_cluster
-        print modularity_list
+#        print modularity_list
         return np.min(np.array(modularity_list))
 #    def SignificanceTest(self,)
 
@@ -261,31 +296,6 @@ class NetStruct(object):
                 membership_list[location[0]][location[1]]=i
         return membership_list
 
-    def calc_edge(self,i,j):
-        Sij = np.zeros(self.nloci)
-        nzeros=0
-        for l in range(self.nloci):
-            a=self.data[i,l*2]
-            b=self.data[i,l*2+1]
-            c=self.data[j,l*2]
-            d=self.data[j,l*2+1]
-            if np.count_nonzero([a,b,c,d])!=4:
-                nzeros+=1
-            else:
-                Iac = int(a==c)
-                Iad = int(a==d)
-                Ibc = int(b==c)
-                Ibd = int(b==d)
-                fa=self.freq_allele[l][self.data[i,l*2]]
-                fb=self.freq_allele[l][self.data[i,l*2+1]]
-                Sij[l]=(1.0/4)*((1.0-fa)*(Iac+Iad)+(1.0-fb)*(Ibc+Ibd))
-        if nzeros==self.nloci:
-            Sijtot=0
-        else:
-            Sijtot=(np.sum(Sij)/float((self.nloci-nzeros)))
-        return Sijtot
-
-
 
 def writefile(graphs):
     import csv
@@ -307,15 +317,15 @@ def readfile(fname):
     with open(fname) as f:
        ncols = len(f.readline().split(','))
     area = np.loadtxt(fname, delimiter=',', usecols=[0],dtype=str)
-    ind  = np.loadtxt(fname, delimiter=',', usecols=[1],dtype=int)
-    data = np.loadtxt(fname, delimiter=',', usecols=range(2,ncols),dtype=int)
+    ind  = np.loadtxt(fname, delimiter=',', usecols=[1],dtype=str)
+    data = np.loadtxt(fname, delimiter=',', usecols=range(2,ncols),dtype=str)
     return data,area,ind
 
 def main(args):
     print (args.fname)
-    global test
+    global test,data,area,ind
     data,area,ind=readfile(args.fname)
-    test = NetStruct(data,area,ind)
+#    test = NetStruct(data,area,ind)
 
 def add_parser_arguments(parser):
     parser.add_argument('--csvfile', type=str, nargs='?',
