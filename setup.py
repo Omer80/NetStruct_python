@@ -11,12 +11,12 @@ from setuptools import setup
 setup(name='netstruct_python',
       version='0.1',
       description='Genetic population structure analysis using networks',
-      url='http://github.com/storborg/funniest',
+      url='https://github.com/Omer80/NetStruct_python',
       author='Gili Greenbaum and Omer Tzuk',
       author_email='omertz@post.bgu.ac.il',
       license='MIT',
       packages=['netstruct_python'],
       install_requires=[
-          'numpy','scipy','igraph','deepdish',
+          'numpy','scipy','python-igraph','deepdish',
       ],
       zip_safe=False)
