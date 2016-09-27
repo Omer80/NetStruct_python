@@ -10,8 +10,6 @@ Created on Tue Mar 29 10:49:02 2016
 3) Strength of Assosiation - SAD
 4) Significance 
 """
-__version__= 1.0
-__author__ = """Omer Tzuk (omertz@post.bgu.ac.il)"""
 import numpy as np
 from scipy import stats
 import igraph
