@@ -39,7 +39,7 @@ class buildGDmatrix(object):
 #            print "Please specify full file name"
 #            raise IOError
         start_time = time.time()
-        print "Constructing network"
+        print "Constructing genetic similarity matrix"
         self.data = data
         self.npop , num_columns = data.shape
         self.nloci = int(num_columns/2)
@@ -53,7 +53,12 @@ class buildGDmatrix(object):
         self.build()
         print "Finished building genetic similarity matrix in : %f seconds" % (time.time() - start_time)
         if outputfname is None:
-            outputfname=fname
+            if fname.endswith('.hdf5'):
+                outputfname=fname[:-5]
+            elif fname.endswith('.csv'):
+                outputfname=fname[:-4]
+            else:
+                pass
         utilities.saveGDmatrix(outputfname,self.area,self.ind,self.data,self.A)
 #        if fname.endswith('.csv'):# Returns a CSV file with the genetic similarity matrix
 #            utilities.saveGDmatrix(fname,self.area,self.ind,self.data,self.A)
@@ -119,6 +124,7 @@ class buildGDmatrix(object):
 def clustering_algorithm(graph,algorithm_num=6): #The default is algorithim 6
     """ (igraph graph object, algorithim number 1-6)->(an igraph cluster object with the detected community partition)
 	Implements one of the igraph community detection algorithims, all with 'weighted networks' option"""
+    algorithm_num=int(algorithm_num)
     if algorithm_num==1:
         clusters = graph.community_label_propagation(weights="weight")
     elif algorithm_num==2:
@@ -186,24 +192,38 @@ def FindCommunities(fname,threshold=0.0,algorithm_num=6):
             graph.vs.find(str(vertex["name"]))["cluster"]=vertex["cluster"]
     return graph #returns the graph (igraph object) with an additional attribute to each node indicating its community (1 is the largest community, 2 after, and so on..)
 
-def loopGDmat(data_fname,threshold_min, threshold_max,threshold_delta,piecharts_fname="piecharts",zipped_pickle_fname="zipped_pickled_graphs", algorithm_num=1):
+def loopGDmat(data_fname,threshold_min, threshold_max,threshold_delta,algorithm_num,outputfname=None):
     """ This function performs community detection for several thresholds (from threshold_min to threshold_max in jumps of threshold_delta)
 	It produces a ZIP file which contains:
 		For each threshold, a ZIP file which contains
 			1. CSV file with columns area,name,cluster for each threshold
 			2. A PDF with the piecharts for each threshold
 			3. A pickled (igraph format) file which contains the partitioned graph. This file is intended for the further analyses
-     """
-    area,ind,GDmatrix=utilities.loadGDmatrix(data_fname)
-    areas = np.unique(area)
-    del ind
-    del GDmatrix
+    """
+    print "Running command: ", data_fname,threshold_min, threshold_max,threshold_delta,algorithm_num,outputfname
+    if outputfname is None:
+        if data_fname.endswith('.hdf5'):
+            outputfname=data_fname[:-5]
+        else:
+            outputfname=data_fname
+#    area,ind,GDmatrix=utilities.loadGDmatrix(data_fname)
+    areas=utilities.loadareas(data_fname)
+#    areas = np.unique(area)
+#    del ind
+#    del area
+#    del GDmatrix
     start_time = time.time()
     graphs=[]
     import os
     thresholds = np.arange(threshold_min, threshold_max+threshold_delta,threshold_delta)
-    print "Output filename: ",zipped_pickle_fname
-    with zipfile.ZipFile(zipped_pickle_fname+".zip", 'w') as myzip:
+    np.savetxt('thresholds.dat',map(str,map(int,(thresholds*1000))), fmt="%s")
+    print "Output filename: ",outputfname
+    with zipfile.ZipFile(outputfname+".zip", 'w') as myzip:
+        myzip.write('thresholds.dat')
+        try:
+            os.remove('thresholds.dat')
+        except OSError:
+            pass
         for threshold in thresholds:
             graph = FindCommunities(data_fname,threshold,algorithm_num)
             graphs.append(graph)
@@ -214,9 +234,16 @@ def loopGDmat(data_fname,threshold_min, threshold_max,threshold_delta,piecharts_
                 os.remove(pickled_graph_name)
             except OSError:
                 pass
+            graph_data = np.array([graph.vs['area'],graph.vs['name'],graph.vs['cluster']])
+            np.savetxt("0_"+pickled_graph_name+"_table.csv",graph_data.T,delimiter=',', fmt="%s")
+            myzip.write("0_"+pickled_graph_name+"_table.csv")
+            try:
+                os.remove("0_"+pickled_graph_name+"_table.csv")
+            except OSError:
+                pass
     print "Finished community detection analysis in : %f seconds" % (time.time() - start_time)
     start_time = time.time()
-    createPieCharts(areas,thresholds,graphs,piecharts_fname=piecharts_fname)#Creates and saves the PDF with piecharts
+    createPieCharts(areas,thresholds,graphs,piecharts_fname="piecharts_"+outputfname)#Creates and saves the PDF with piecharts
     print "Finished producing PDF with piecharts in : %f seconds" % (time.time() - start_time)
 
 def createPieCharts(areas,thresholds,graphs,piecharts_fname="piecharts"):
@@ -248,7 +275,7 @@ def calcPiecharts(graph,areas):
         fracs[area]=np.bincount(map(int,mat[np.where(mat[:,0]==area)][:,1]))/float(len(map(int,mat[np.where(mat[:,0]==area)][:,1])))
     return fracs
 
-def SADanalysis(zipped_pickle_fname,threshold,csv_fname="SADresults.csv"):
+def SADanalysis(zipped_pickle_fname,threshold,csv_fname):
     """ (fname_matrix,fname_communities)->
     Loads one of the pickled graphs from the zip file
     Loops all of the individuals of the graph
@@ -258,8 +285,17 @@ def SADanalysis(zipped_pickle_fname,threshold,csv_fname="SADresults.csv"):
     2) pickled graph with a new attribute of strength of association
     """
 #    print str(int(threshold*1000))
+    if csv_fname is None:
+        csv_fname="SADresults.csv"
     print "Output file: ",csv_fname
     with zipfile.ZipFile(zipped_pickle_fname+".zip", 'r') as myzip:
+#        myzip.extract('thresholds.dat')
+#        file_thresholds = np.array(map(int,np.loadtxt('thresholds.dat')))
+##        print file_thresholds
+#        str_threshold=int(threshold*10000)
+##        print str_threshold
+#        threshold=str(file_thresholds[(np.abs(file_thresholds-str_threshold)).argmin()])
+#        print "Extracting 0.%s threshold from zip file" % threshold
         myzip.extract(str(int(threshold*1000)))
     graph=igraph.Graph.Read_Picklez(str(int(threshold*1000))) #Reads the igraph graph object from the pickle-zipped file for the selected threshold
     import os
@@ -274,7 +310,9 @@ def SADanalysis(zipped_pickle_fname,threshold,csv_fname="SADresults.csv"):
     except AssertionError:
         print "Error: Cannot run SAD analysis since only one cluster (no structure) was detected"
         raise
+    """ Save results into CSV file """
     rows=[]
+    fieldnames = "area,name,cluster,SAA,Most associated alternative community"
     for name in names:
         indx,min_modularity=SA(graph,name,clusters) #For each individual, calculate the Strength of Association (SA)
         graph.vs.find(name)["SOA"]=min_modularity
@@ -282,14 +320,15 @@ def SADanalysis(zipped_pickle_fname,threshold,csv_fname="SADresults.csv"):
                   graph.vs.find(name)["name"],
                   graph.vs.find(name)["cluster"],
                   min_modularity,indx))
-    import csv
-    with open(csv_fname, 'w') as csvfile:
-        fieldnames = ['area', 'name','cluster','SA','Most associated alternative community']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-#                print row
-            writer.writerow({'area':row[0],'name':row[1],'cluster':row[2],'SAA':row[3],'Most associated alternative community':row[4]})
+    np.savetxt(csv_fname,rows,delimiter=',',header=fieldnames, fmt="%s")
+#    import csv
+#    with open(csv_fname, 'w') as csvfile:
+#        fieldnames = ['area', 'name','cluster','SAA','Most associated alternative community']
+#        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+#        writer.writeheader()
+#        for row in rows:
+##                print row
+#            writer.writerow({'area':row[0],'name':row[1],'cluster':row[2],'SAA':row[3],'Most associated alternative community':row[4]})
     return graph
 #        return f_SAD #save in CSV format
 
@@ -350,53 +389,43 @@ def organize_in_decreasing_order(membership_list):
 
 def main(args):
     if args.createGDmatrix is not None:
-        print args.outfname
         buildGDmatrix(args.createGDmatrix,args.outfname)
-    if args.loopGDmat is not None:
-        fname,threshold_min,threshold_max,threshold_delta,algorithm_num = args.loopGDmat
-        print "Processing command: ",fname,threshold_min,threshold_max,threshold_delta,algorithm_num
-        loopGDmat(fname,float(threshold_min),float(threshold_max),float(threshold_delta)
-                 ,args.piecharts_fname,args.zipped_pickle_fname, args.algorithm_num)
-    if args.SAD is not None:
+    elif args.loopGDmat is not None:
+        if args.outfname=="output_file":
+            args.outfname = "Community_Detection_Results"
+        input_fname,threshold_min,threshold_max,threshold_delta,algorithm_num = args.loopGDmat
+        print "Processing command: ",input_fname,threshold_min,threshold_max,threshold_delta,algorithm_num,args.outfname
+        loopGDmat(input_fname,float(threshold_min),float(threshold_max),float(threshold_delta)
+                 ,algorithm_num,args.loopGDmat_results)
+    elif args.SAD is not None:
         input_file, threshold = args.SAD
-        if args.outfname is not None:
-            SADanalysis(input_file,float(threshold),args.outfname)
-        else:
-            SADanalysis(input_file,float(threshold))
+        SADanalysis(input_file,float(threshold),args.outfname)
     return 0
 
 def add_parser_arguments(parser):
-    parser.add_argument('-i','--datafile', type=str, nargs='?',
-                        default=None,
-                        dest='fname',
-                        help='input file')
+#    parser.add_argument('filename', type=str, nargs='?', default=None,
+#                        dest='infname',
+#                        help='input file')
     parser.add_argument('-o','--outputfile', type=str, nargs='?',
                         default=None,
                         dest='outfname',
                         help='output file')
-    parser.add_argument('-c','--createGD', type=str, nargs='?',
+    parser.add_argument('-b','--createGD', type=str, nargs='?',
                         default=None,
+#                        action="store_true",
                         dest='createGDmatrix',
                         help='Create GD matrix from csv or hdf5 file')
-    parser.add_argument('-l','--loopGDmat', type=str, nargs=5,
+    parser.add_argument('-c','--loopGDmat', type=str, nargs=5,
                         default=None,
-                        metavar=('loopGDmat', 'threshold_min', 'threshold_max', 'threshold_delta','algorithm_num'),
-                        help='Loop GD matrix, with min, max, delta of threshold, and algorithm type')
-#    parser.add_argument('-a','--algorithm_num', type=int,
-#                        default=1,
-#                        dest='algorithm_num',
-#                        help='Choose one of six algorithms of community detection.')
-    parser.add_argument('-z','--zipped_pickle_fname', type=str, nargs='?',
+                        metavar=('input_fname','threshold_min', 'threshold_max', 'threshold_delta','algorithm_num'),
+                        help='Loop GD matrix, args are: min threshold, max threshold, delta of threshold, and algorithm type')
+    parser.add_argument('-z','--loopGDmat_results', type=str, nargs='?',
                         default="Community_Detection_Results",
-                        dest='zipped_pickle_fname',
-                        help='zipped_pickle_fname file')                        
-    parser.add_argument('-p','--piecharts_fname', type=str, nargs='?',
-                        default="piecharts",
-                        dest='piecharts_fname',
-                        help='piecharts_fname file')                        
+                        dest='loopGDmat_results',
+                        help='loopGDmat results filename')                        
     parser.add_argument('-s','--SAD', type=str, nargs=2,
                         default=None,
-                        metavar=('SADanalysis','threshold'),
+                        metavar=('SADthreshold','threshold'),
                         help='SAD analysis file')                        
     return parser
 

@@ -41,7 +41,7 @@ def csv2h5(fname):
     if fname.endswith('.csv'):
         fname=fname[:-4]
     data_dict = {'data':data,'area':area,'ind':ind}
-    dd.io.save(fname,data_dict)
+    dd.io.save(fname,data_dict,compression='blosc')
 #    if fname.endswith('.csv'):
 #        data_array,area,ind = readcsv(fname)
 #        fname = fname[:-4]
@@ -60,7 +60,7 @@ def saveGDmatrix(fname,area,ind,data_a,GDmatrix):
         fname+=".hdf5"
     data_dict = {'area':area,'ind':ind,'data':data_a,'GDmatrix':GDmatrix}
     print "Writing to file ",fname
-    dd.io.save(fname,data_dict)
+    dd.io.save(fname,data_dict,compression='blosc')
 #    else:
 #        fname = fname+".hdf5"
 #    with h5py.File(fname, 'w') as f:
@@ -76,6 +76,13 @@ def saveGDmatrix(fname,area,ind,data_a,GDmatrix):
 #        fname = fname+".hdf5"
 #    with h5py.File(fname, 'a') as f:
 #        f.create_dataset("GDmatrix", data=GDmatrix, compression="gzip")
+
+def loadareas(fname):
+    if fname.endswith('.hdf5'):
+        pass
+    else:
+        fname = fname+".hdf5"
+    return np.unique(dd.io.load(fname,'/area'))
 
 def loadGDmatrix(fname):
     if fname.endswith('.hdf5'):
