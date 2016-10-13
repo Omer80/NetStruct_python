@@ -17,6 +17,6 @@ setup(name='netstruct_python',
       license='MIT',
       packages=['netstruct_python'],
       install_requires=[
-          'numpy','scipy','python-igraph','deepdish',
+          'numpy','scipy','matplotlib','python-igraph','deepdish',
       ],
       zip_safe=False)

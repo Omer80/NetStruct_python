@@ -228,17 +228,17 @@ def loopGDmat(data_fname,threshold_min, threshold_max,threshold_delta,algorithm_
             graph = FindCommunities(data_fname,threshold,algorithm_num)
             graphs.append(graph)
             pickled_graph_name=str(int(threshold*1000))
-            graph.write_picklez(fname=pickled_graph_name)
-            myzip.write(pickled_graph_name)
+            graph.write_picklez(fname="0_"+pickled_graph_name)
+            myzip.write("0_"+pickled_graph_name)
             try:
-                os.remove(pickled_graph_name)
+                os.remove("0_"+pickled_graph_name)
             except OSError:
                 pass
             graph_data = np.array([graph.vs['area'],graph.vs['name'],graph.vs['cluster']])
-            np.savetxt("0_"+pickled_graph_name+"_table.csv",graph_data.T,delimiter=',', fmt="%s")
-            myzip.write("0_"+pickled_graph_name+"_table.csv")
+            np.savetxt("0_"+pickled_graph_name+".csv",graph_data.T,delimiter=',', fmt="%s")
+            myzip.write("0_"+pickled_graph_name+".csv")
             try:
-                os.remove("0_"+pickled_graph_name+"_table.csv")
+                os.remove("0_"+pickled_graph_name+".csv")
             except OSError:
                 pass
     print "Finished community detection analysis in : %f seconds" % (time.time() - start_time)
@@ -296,11 +296,11 @@ def SADanalysis(zipped_pickle_fname,threshold,csv_fname):
 ##        print str_threshold
 #        threshold=str(file_thresholds[(np.abs(file_thresholds-str_threshold)).argmin()])
 #        print "Extracting 0.%s threshold from zip file" % threshold
-        myzip.extract(str(int(threshold*1000)))
-    graph=igraph.Graph.Read_Picklez(str(int(threshold*1000))) #Reads the igraph graph object from the pickle-zipped file for the selected threshold
+        myzip.extract("0_"+str(int(threshold*1000)))
+    graph=igraph.Graph.Read_Picklez("0_"+str(int(threshold*1000))) #Reads the igraph graph object from the pickle-zipped file for the selected threshold
     import os
     try:
-        os.remove(str(int(threshold*1000)))
+        os.remove("0_"+str(int(threshold*1000)))
     except OSError:
         pass
     names = graph.vs["name"]
@@ -312,7 +312,7 @@ def SADanalysis(zipped_pickle_fname,threshold,csv_fname):
         raise
     """ Save results into CSV file """
     rows=[]
-    fieldnames = "area,name,cluster,SAA,Most associated alternative community"
+    fieldnames = "Sampled population,Individual's ID,Assigned community,SA,Most associated alternative community"
     for name in names:
         indx,min_modularity=SA(graph,name,clusters) #For each individual, calculate the Strength of Association (SA)
         graph.vs.find(name)["SOA"]=min_modularity
