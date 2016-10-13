@@ -11,12 +11,13 @@ Created on Tue Mar 29 10:49:02 2016
 4) Significance 
 """
 import numpy as np
+import deepdish as dd
 from scipy import stats
 import igraph
 import zipfile
 from collections import Counter
 import time
-import utilities
+
 """ Matrix construction algorithms """
 class buildGDmatrix(object):
     """ class for building Genetic Similarity matrix from dataset """
@@ -28,13 +29,13 @@ class buildGDmatrix(object):
         (in case it was CSV it will be changed to hdf5)         
         """
         try:
-            data,area,ind = utilities.read_data(fname)
+            data,area,ind = read_data(fname)
         except IOError:
             print "Please specify full file name"
 #        if fname.endswith('.csv'):
-#            data,area,ind = utilities.readcsv(fname)
+#            data,area,ind = readcsv(fname)
 #        elif fname.endswith(('.h5','.hdf5')):
-#            data,area,ind = utilities.loadh5(fname)
+#            data,area,ind = loadh5(fname)
 #        else:
 #            print "Please specify full file name"
 #            raise IOError
@@ -59,14 +60,14 @@ class buildGDmatrix(object):
                 outputfname=fname[:-4]
             else:
                 pass
-        utilities.saveGDmatrix(outputfname,self.area,self.ind,self.data,self.A)
+        saveGDmatrix(outputfname,self.area,self.ind,self.data,self.A)
 #        if fname.endswith('.csv'):# Returns a CSV file with the genetic similarity matrix
-#            utilities.saveGDmatrix(fname,self.area,self.ind,self.data,self.A)
+#            saveGDmatrix(fname,self.area,self.ind,self.data,self.A)
 #        elif fname.endswith(('.h5','.hdf5')):# Returns an hdf5 file with the genetic similarity matrix
 #            if outputfname is None:
-#                utilities.addGDmatrix(fname,self.A)
+#                addGDmatrix(fname,self.A)
 #            else:
-#                utilities.saveGDmatrix(outputfname,self.area,self.ind,self,data,self.A)
+#                saveGDmatrix(outputfname,self.area,self.ind,self,data,self.A)
 
 
     def calc_edge(self,i,j):
@@ -162,7 +163,7 @@ def FindCommunities(fname,threshold=0.0,algorithm_num=6):
     5 : spinglass.community            -> returns VertexClustering object.
     6 : leading.eigenvector.community  -> returns VertexClustering object.
     """
-    area,ind,GDmatrix=utilities.loadGDmatrix(fname)
+    area,ind,GDmatrix=loadGDmatrix(fname)
     matx=stats.threshold(GDmatrix, threshmin=threshold,newval=0) # Creates an adjacency matrix with a threshold applied to GDmatrix (i.e. all values below the threshold are taken to be 0)
     graph = igraph.Graph.Weighted_Adjacency(matx.tolist(),attr="weight",mode="UPPER")#Creates an undirected weighted igraph graph object with the adjacency matrix
     graph["name"] = "NetStruck Weighted Graph with threshold={0}".format(threshold)
@@ -206,8 +207,8 @@ def loopGDmat(data_fname,threshold_min, threshold_max,threshold_delta,algorithm_
             outputfname=data_fname[:-5]
         else:
             outputfname=data_fname
-#    area,ind,GDmatrix=utilities.loadGDmatrix(data_fname)
-    areas=utilities.loadareas(data_fname)
+#    area,ind,GDmatrix=loadGDmatrix(data_fname)
+    areas=loadareas(data_fname)
 #    areas = np.unique(area)
 #    del ind
 #    del area
@@ -401,6 +402,64 @@ def main(args):
         input_file, threshold = args.SAD
         SADanalysis(input_file,float(threshold),args.outfname)
     return 0
+
+def read_data(fname):
+    """ read initial data from either csv of hdf5/h5 files """
+    if fname.endswith('.csv'):
+        data,area,ind = readcsv(fname)
+    elif fname.endswith(('.h5','.hdf5')):
+        data,area,ind=readhdf5(fname)
+    return data,area,ind
+
+def readcsv(fname):
+    """ read initial data from csv file """
+    with open(fname) as f:
+       ncols = len(f.readline().split(','))
+    area = np.loadtxt(fname, delimiter=',', usecols=[0],dtype=str)
+    ind  = np.loadtxt(fname, delimiter=',', usecols=[1],dtype=str)
+    data = np.loadtxt(fname, delimiter=',', usecols=range(2,ncols),dtype=str)
+    return data,area,ind
+
+def readhdf5(fname):
+    """ read initial data from hdf5 file """
+    dict_data = dd.io.load(fname)
+    data=dict_data['data']
+    area=dict_data['area']
+    ind =dict_data['ind']
+    return data,area,ind
+
+def csv2h5(fname):
+    """ transform a csv initial file data to hdf5 format """
+    data,area,ind = readcsv(fname)
+    if fname.endswith('.csv'):
+        fname=fname[:-4]
+    data_dict = {'data':data,'area':area,'ind':ind}
+    dd.io.save(fname,data_dict,compression='blosc')
+
+def saveGDmatrix(fname,area,ind,data_a,GDmatrix):
+    if fname.endswith('.csv'):
+        fname=fname[:-4]
+        fname+=".hdf5"
+    elif not fname.endswith(('.h5','.hdf5')):
+        fname+=".hdf5"
+    data_dict = {'area':area,'ind':ind,'data':data_a,'GDmatrix':GDmatrix}
+    print "Writing to file ",fname
+    dd.io.save(fname,data_dict,compression='blosc')
+
+def loadareas(fname):
+    if fname.endswith('.hdf5'):
+        pass
+    else:
+        fname = fname+".hdf5"
+    return np.unique(dd.io.load(fname,'/area'))
+
+def loadGDmatrix(fname):
+    if fname.endswith('.hdf5'):
+        pass
+    else:
+        fname = fname+".hdf5"
+    data_dict = dd.io.load(fname)
+    return data_dict['area'],data_dict['ind'],data_dict['GDmatrix']
 
 def add_parser_arguments(parser):
 #    parser.add_argument('filename', type=str, nargs='?', default=None,
