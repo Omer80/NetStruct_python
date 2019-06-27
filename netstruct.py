@@ -164,7 +164,10 @@ def FindCommunities(fname,threshold=0.0,algorithm_num=6):
     6 : leading.eigenvector.community  -> returns VertexClustering object.
     """
     area,ind,GDmatrix=loadGDmatrix(fname)
-    matx=stats.threshold(GDmatrix, threshmin=threshold,newval=0) # Creates an adjacency matrix with a threshold applied to GDmatrix (i.e. all values below the threshold are taken to be 0)
+    # matx=stats.threshold(GDmatrix, threshmin=threshold,newval=0) # Creates an adjacency matrix with a threshold applied to GDmatrix (i.e. all values below the threshold are taken to be 0)
+    matx = GDmatrix
+    matx[matx<threshold] = 0
+
     graph = igraph.Graph.Weighted_Adjacency(matx.tolist(),attr="weight",mode="UPPER")#Creates an undirected weighted igraph graph object with the adjacency matrix
     graph["name"] = "NetStruck Weighted Graph with threshold={0}".format(threshold)
     graph.vs["area"]=area
